@@ -1,0 +1,262 @@
+# TempoChantier
+
+Application pedagogique de planning de chantier, chemin critique et risque de
+retard. Public : etudiants en genie civil, notamment pour un devoir de niveau L3.
+Les noms des taches et leurs durees dans les exemples sont entierement fictifs.
+
+## Trois fichiers livres
+
+- app.py : calculs, interface, graphiques, schemas, exemples et exports.
+- requirement.text : dependances Python.
+- README : installation, usage, tests et deploiement.
+
+Aucun compte, secret, base de donnees ni fichier de configuration supplementaire.
+Les donnees restent dans la session du navigateur. Exporter le projet JSON avant
+de fermer ou reinitialiser la session. Les sessions ne constituent pas un stockage
+permanent. L'apercu fictif a l'ouverture n'est pas insere dans le projet utilisateur.
+
+## Installation Windows dans VS Code
+
+Installer Python 3.12 ou plus recent, puis ouvrir le dossier tempochantier dans
+VS Code. Python 3.14 est la version effectivement testee pour cette livraison.
+Ouvrir Terminal > Nouveau terminal dans ce dossier.
+
+    python --version
+    python -m pip install -r requirement.text
+    python -m streamlit run app.py
+
+Ouvrir l'adresse locale affichee dans le terminal. Fermer l'application avec
+Ctrl+C dans le terminal. Si un port est occupe :
+
+    python -m streamlit run app.py --server.port 8530
+
+Facultatif : creer un environnement virtuel HORS du dossier livre :
+
+    python -m venv ..\tempochantier-env
+    ..\tempochantier-env\Scripts\python.exe -m pip install -r requirement.text
+    ..\tempochantier-env\Scripts\python.exe -m streamlit run app.py
+
+L'application utilise les composants Streamlit v2 et exige Streamlit >= 1.65.
+Les plages du fichier requirement.text ne sont pas un verrouillage exact des
+versions. Pour une reproduction stricte des tirages, conserver les memes versions
+de Python, NumPy et SciPy, ainsi que les memes taches, graine et nombre de tirages.
+
+## Bibliotheques
+
+Streamlit : formulaires, tableaux, navigation, session et composants de schemas.
+NumPy : tirages uniformes, calcul vectorise, quantiles et statistiques.
+pandas : tableaux, lecture CSV et Excel, preparation des exports.
+SciPy : loi triangulaire, Spearman et intervalle binomial exact.
+NetworkX : validation du graphe, ordre topologique et controle du plus long chemin.
+Plotly : graphiques interactifs, histogrammes et courbes.
+openpyxl : classeurs Excel .xlsx en lecture et en ecriture.
+ReportLab : rapport PDF pagine, tableaux et polices embarquees.
+Matplotlib : graphiques du rapport PDF et polices DejaVu fournies par la librairie.
+tzdata : fuseau Europe/Paris pour l'horodatage des rapports sous Windows.
+
+## Rubriques
+
+1. Planning : Gantt, chemin critique, dates, marges, reseau et parallelisme.
+2. Taches et liens : ajouter, modifier, supprimer, editer le tableau et regler le projet.
+3. Risque de retard : Monte-Carlo, probabilite, intervalle, quantiles, criticite,
+   associations de rang et comparaison de trois echeances.
+4. Scenarios : modifier a / m / b d'une seule tache, sans remplacer l'actuel,
+   et comparer avec des tirages apparies.
+5. Donnees et rapports : imports CSV / Excel / JSON, exports JSON / CSV / Excel / PDF.
+6. Comprendre : exemple manuel, probabilites, parcours de tests, quiz et limites.
+
+Les actions de remplacement demandent une confirmation. Une saisie invalide ne
+remplace pas le projet valide. Une modification de tache invalide les analyses
+precedentes. Les filtres du Gantt sont seulement visuels.
+
+## Modele, unites et limites
+
+Toutes les durees sont en jours de travail ABSTRAITS, sans date, week-end ni jour
+ferie. Les liens sont fin-debut sans decalage. Les ressources sont supposees
+disponibles : deux taches paralleles peuvent travailler simultanement.
+Le logiciel ne calcule pas les besoins d'equipes, les couts, les delais de cure,
+la securite, la meteo commune ou les contraintes reglementaires.
+
+Pour chaque tache : 0 <= minimum a <= plus probable m <= maximum b <= 365 jours.
+Une duree fixe utilise a = m = b ; une duree nulle est un jalon.
+Le planning nominal utilise m, ou (a + m + b)/3 si l'utilisateur choisit la moyenne
+triangulaire. Ce n'est PAS une formule PERT ponderee.
+
+Debut au plus tot = maximum des fins des predecesseurs ; debut 0 si aucun.
+Fin au plus tot = debut + duree.
+Fin au plus tard = minimum des debuts au plus tard des suivantes ; fin du projet
+si aucune suivante. Marge totale = debut au plus tard - debut au plus tot.
+Une tache critique a une marge totale nulle, a la tolerance numerique pres.
+Plusieurs chemins critiques peuvent coexister.
+
+La simulation utilise des durees INDEPENDANTES triangulaires. Chaque tirage
+recalcule tout le reseau. Retard signifie duree STRICTEMENT superieure a l'echeance.
+Une tolerance de huit ULP autour d'un seuil positif corrige les arrondis flottants ;
+le seuil zero reste strictement zero. L'intervalle affiche est Clopper-Pearson a 95 %
+sur la proportion simulee, pas une garantie sur le chantier ou les hypotheses.
+Il n'est pas affiche si la duree totale est constante sur les bornes saisies.
+Les quantiles NumPy utilisent l'interpolation lineaire. La courbe cumulee est
+reduite a 350 points pour l'affichage, mais les calculs utilisent tous les tirages.
+
+La criticite est la frequence d'une marge nulle dans les simulations, pas une
+probabilite de defaillance. Spearman est une association, pas une causalite.
+Les correlations des durees constantes ne sont pas definies.
+La comparaison reutilise les memes nombres uniformes pour chaque tache dans les
+deux scenarios. Elle ne determine ni faisabilite ni cout des changements.
+
+## Exemples de test
+
+Charger un jeu dans le menu lateral > Exemples fictifs. Cela remplace le projet,
+jamais ne le melange silencieusement a des donnees existantes.
+
+### 1. Controle simple : sept jours
+
+ID | a / m / b (j) | Predecesseurs
+A  | 2 / 2 / 2     | aucun
+B  | 4 / 4 / 4     | A
+C  | 3 / 3 / 3     | A
+D  | 1 / 1 / 1     | B, C
+
+Attendus : duree 7 j ; somme des durees 10 j ; chemin A-B-D ; marge de C 1 j.
+A : debut 0, fin 2. B : 2 a 6. C : 2 a 5. D : 6 a 7.
+C : debut au plus tard 3, fin au plus tard 6, marge libre 1 j.
+Au plus 2 taches simultanees. Toutes les durees simulees valent 7 j.
+Echeance 7 j : risque 0 %. Echeance 6,9 j : risque 100 %.
+P50 = P80 = P95 = 7 j. Les correlations sont non definies.
+Variante B = 2 / 2 / 2 : duree du projet 6 j, chemin A-C-D.
+Variante C = 1 / 1 / 1 : duree du projet toujours 7 j.
+
+### 2. Deux chemins concurrents
+
+A fixe 1 j ; B et C independantes 2 / 4 / 6 j apres A ; D fixe 1 j apres B et C.
+Duree nominale 6 j, support theorique de 4 a 8 j.
+Echeance 7 j : P(T > 7) = 1 - P(B <= 5)*P(C <= 5)
+= 1 - (7/8)^2 = 15/64 = 23,4375 %.
+Avec 50 000 tirages, viser une valeur proche (tolerance de test : 1 point).
+A et D ont une criticite de 100 %, B et C environ 50 % chacune.
+Les deux chemins nominaux sont critiques.
+
+### 3. Petit chantier pedagogique
+
+Huit taches, de l'installation a la reception pedagogique. Duree nominale 18 j.
+Un chemin critique : A-B-D-F-G-H ; six taches critiques.
+Marge de C : 1 j ; marge de E : 3 j. Echeance initiale : 20 j.
+Aucun resultat probabiliste exact n'est annonce pour cet exemple.
+Les durées ne sont pas des valeurs de production ou des prescriptions reelles.
+
+### 4. Saisie et erreurs
+
+Nom vide, identifiant duplique, predecesseur inconnu, cycle A-B-A ou a > m : refus.
+La suppression d'une tache ayant des suivantes exige un retrait explicite des liens.
+Un projet vide n'est pas simule. Toutes les durees nulles et echeance 0 donnent
+un projet de 0 j et un risque de 0 %. Toute duree positive avec echeance 0 est en retard.
+
+### 5. Donnees et rapports
+
+Exporter le JSON, creer un projet vide, reimporter puis confirmer : meme configuration.
+CSV / Excel ne restaurent que les taches : parametres conserves, analyses reinitialisees.
+CSV UTF-8 avec virgules ; feuille Excel Taches sinon premiere feuille.
+Colonnes requises : id, nom, min_j, mode_j, max_j.
+Colonnes facultatives : phase (defaut Autre), predecesseurs (defaut vide).
+50 taches au maximum, 10 predecesseurs par tache, fichier de 2 Mo ; .xlsx decompresse
+limite a 20 Mo. Les imports ne prouvent pas l'origine declaree des donnees.
+Les textes CSV commencant par =, +, - ou @ sont neutralises pour les tableurs ;
+le JSON preserve le texte exact. Les cellules Excel textuelles ne sont pas des formules.
+
+Preparer le PDF, puis le telecharger. Toute modification appliquee supprime l'ancien
+rapport prepare pour eviter un export perime. Le PDF et l'Excel incluent seulement
+les analyses actives et les donnees enregistrees, jamais l'apercu initial.
+
+## Publier depuis VS Code vers GitHub
+
+Utiliser un NOUVEAU depot, par exemple tempochantier, distinct de vos autres apps.
+Ne pas reutiliser le remote de TopoCheck ou de StructureLab.
+Creer un depot vide sur GitHub, sans README initial si les fichiers sont deja locaux.
+Ouvrir une COPIE de deploiement du dossier, pas le dossier de livraison.
+
+    git init
+    git add .
+    git commit -m "Premiere version de TempoChantier"
+    git branch -M main
+    git remote add origin https://github.com/VOTRE_COMPTE/tempochantier.git
+    git remote -v
+    git push -u origin main
+
+Remplacer VOTRE_COMPTE par son compte reel. Si origin existe deja, verifier d'abord
+qu'il correspond a ce projet. Pour corriger seulement ce remote :
+
+    git remote set-url origin https://github.com/VOTRE_COMPTE/tempochantier.git
+    git remote -v
+
+Les depots ne contiennent pas de secrets, donnees sensibles, environnements Python,
+captures, caches, tests ou exports personnels.
+
+## Streamlit Community Cloud
+
+IMPORTANT : Community Cloud attend le nom standard requirements.txt.
+Le dossier livre conserve requirement.text comme demande.
+Dans une copie de deploiement distincte, AVANT git add :
+
+    Copy-Item -LiteralPath .\requirement.text -Destination .\requirements.txt
+
+On peut alors retirer requirement.text de cette copie apres verification ; ne pas
+le retirer du dossier de livraison. Le depot de deploiement doit contenir app.py,
+requirements.txt et README. Si vous gardez les deux fichiers, seul requirements.txt
+est reconnu comme manifeste standard par la plateforme.
+
+Sur share.streamlit.io, creer une application depuis GitHub :
+- Repository : VOTRE_COMPTE/tempochantier
+- Branch : main
+- Main file path : app.py
+- Python : preferer 3.14 si propose, sinon une version >= 3.12 compatible.
+- Advanced settings : aucun secret requis.
+
+Avec Paste URL, donner l'URL du FICHIER, pas seulement celle du depot :
+https://github.com/VOTRE_COMPTE/tempochantier/blob/main/app.py
+
+Deploy, puis attendre la fin de l'installation. En cas de ModuleNotFoundError,
+verifier le nom exact requirements.txt, son contenu, la branche et les journaux
+dans Manage app. Un reboot seul ne corrige pas un manifeste mal nomme.
+Le lien public sera en .streamlit.app ; il n'est pas cree par le present livrable.
+
+## Modifier une application deja deployee
+
+Dans la copie locale reliee au bon depot, remplacer le contenu du meme app.py ;
+ne pas ajouter app2.py ou des anciennes versions sans besoin.
+
+    git status
+    git remote -v
+    git add app.py requirements.txt README
+    git commit -m "Amelioration de TempoChantier"
+    git push
+
+Community Cloud recupere les modifications sur la branche deployee. Verifier
+l'interface et les journaux. Exporter les donnees JSON avant un redemarrage.
+Les analyses sont en memoire, pas un service de calcul ou de stockage garanti.
+
+## References
+
+https://networkx.org/documentation/stable/reference/algorithms/dag.html
+https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.triang.html
+https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.spearmanr.html
+https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/app-dependencies
+
+## Verification de la livraison
+
+Verification locale du 20 octobre 2026 :
+- 40 tests automatises : moteur, marges, simulations, parametres invalides,
+  imports, exports, navigation, formulaires, confirmations et rapport perime.
+- Parcours navigateur sur 1440, 768, 390 et 320 pixels de large : six rubriques,
+  ajout de tache, simulation, comparaison, controles de reference et rapport.
+- Telechargements JSON / CSV / Excel / PDF et reimport JSON depuis le navigateur.
+- Quatre rapports PDF testes : vide, mini-lot, analyses completes et 50 taches
+  aux noms longs ; rendu des 16 pages et controle des limites du texte.
+- Python 3.14 ; Streamlit 1.65.0 ; NumPy 2.5.3 ; pandas 3.0.6 ; SciPy 1.18.1 ;
+  NetworkX 3.7 ; Plotly 7.1.0 ; openpyxl 3.1.5 ; ReportLab 4.5.1.
+
+Les tailles d'ecran ont ete emulees dans Edge : pas de test sur un telephone
+physique ni sur toutes les combinaisons de navigateurs, versions et systemes.
+Le bouton Comprendre > Tests guides permet aussi de relancer huit cas de reference.
+Le deploiement GitHub / Community Cloud n'est pas realise automatiquement.
+Ce logiciel est un support de devoir et d'apprentissage, pas une validation
+professionnelle d'un calendrier de construction.
